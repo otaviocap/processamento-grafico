@@ -165,7 +165,9 @@ void generateBoard() {
     for (int x = 0; x < COLUMNS; x++) {
         for (int y = 0; y < ROWS; y++) {
             Quad quad = {};
-            quad.position = glm::vec2((QUAD_WIDTH / 2) + x * QUAD_WIDTH, (QUAD_HEIGHT / 2) + y * QUAD_HEIGHT);
+            quad.position = glm::vec2(
+                (QUAD_WIDTH / 2) + x * QUAD_WIDTH,
+                (QUAD_HEIGHT / 2) + y * QUAD_HEIGHT);
             quad.color = randomColor();
             quads[x][y] = quad;
         }
@@ -217,7 +219,7 @@ bool gameHasEnded() {
 }
 
 void printScore() {
-    std::cout << "Parabéns! você obteve " << score << " pontos" << std::endl;
+    std::cout << "Parabéns! Você obteve " << score << " pontos" << std::endl;
     std::cout << "Recomeçando" << std::endl;
 }
 
