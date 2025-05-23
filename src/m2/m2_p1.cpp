@@ -29,12 +29,12 @@ void main()
 }
 )GLSL";
 
-void framebuffer_size_callback(GLFWwindow* window, const int width, const int height)
+void framebufferSizeCallback(GLFWwindow* window, const int width, const int height)
 {
     glViewport(0, 0, width, height);
 }
 
-void process_input(GLFWwindow* window) {
+void processInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
@@ -140,7 +140,7 @@ int main() {
     }
 
     glViewport(0, 0, WIDTH, HEIGHT);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
     const GLuint shaderProgram = createShaderProgram();
     std::vector<GLuint> VAOs;
@@ -159,7 +159,7 @@ int main() {
     while(!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
-        process_input(window);
+        processInput(window);
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);

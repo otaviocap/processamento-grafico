@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <glad.h>
+#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -14,31 +15,37 @@
 #include "glm/gtx/transform.hpp"
 
 constexpr int WIDTH = 800;
-constexpr int HEIGHT = 600;
+constexpr int HEIGHT = 800;
+constexpr int COLUMNS = 10;
+constexpr int ROWS = 10;
+constexpr int QUAD_WIDTH = WIDTH / COLUMNS;
+constexpr int QUAD_HEIGHT = HEIGHT / ROWS;
 
-struct Triangle
+constexpr double MAX_DISTANCE = sqrt(3.0);
+constexpr double TOLERANCE = 0.2;
+
+constexpr int CHAIN_MULTIPLIER = 2;
+constexpr int PLAY_COST = 5;
+
+int score = 0;
+
+struct Quad
 {
-public:
     glm::vec2 position;
     glm::vec3 color;
+    bool visible = true;
 };
 
-constexpr glm::vec3 colors[] = {
-    glm::vec3(0.0f, 0.0f, 1.0f),
-    glm::vec3(0.0f, 1.0f, 0.0f),
-    glm::vec3(0.0f, 1.0f, 1.0f),
-    glm::vec3(1.0f, 0.0f, 0.0f),
-    glm::vec3(1.0f, 0.0f, 1.0f),
-    glm::vec3(1.0f, 1.0f, 0.0f),
-    glm::vec3(1.0f, 1.0f, 1.0f),
-    glm::vec3(0.5f, 1.0f, 0.5f),
-    glm::vec3(0.5f, 1.0f, 1.0f)
-};
+float randomFloat() {
+    return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);;
+}
 
 glm::vec3 randomColor()
 {
-    return colors[rand() % sizeof(colors) / sizeof(colors[0])];
+    return {randomFloat(), randomFloat(), randomFloat()};
 };
+
+constexpr glm::vec3 clearColor = glm::vec3(0.0f, 0.0f, 0.0f);
 
 
 constexpr auto vertexShaderSource =
@@ -68,14 +75,6 @@ void main()
 void framebufferSizeCallback(GLFWwindow* window, const int width, const int height)
 {
     glViewport(0, 0, width, height);
-}
-
-
-
-void processInput(GLFWwindow* window) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-    }
 }
 
 GLuint compileShader(const char* shaderSource, int shaderType) {
@@ -129,13 +128,15 @@ GLuint createVBOAndBind(const GLuint VAO, const float* vertices, const int verti
     return VBO;
 }
 
-GLuint createTriangle(
+GLuint createQuad(
     const float x1,
     const float y1,
     const float x2,
     const float y2,
     const float x3,
-    const float y3) {
+    const float y3,
+    const float x4,
+    const float y4) {
     GLuint VAO;
     glGenVertexArrays(1, &VAO);
 
@@ -143,6 +144,7 @@ GLuint createTriangle(
         x1, y1, 0.0f,
         x2, y2, 0.0f,
         x3, y3, 0.0f,
+        x4, y4, 0.0f,
     };
 
     createVBOAndBind(VAO, vertices, sizeof(vertices) / sizeof(float));
@@ -156,15 +158,95 @@ GLuint createTriangle(
     return VAO;
 }
 
-int main() {
-    std::vector<Triangle> triangles;
+Quad quads[COLUMNS][ROWS];
+Quad* selectedQuad;
 
+void generateBoard() {
+    for (int x = 0; x < COLUMNS; x++) {
+        for (int y = 0; y < ROWS; y++) {
+            Quad quad = {};
+            quad.position = glm::vec2((QUAD_WIDTH / 2) + x * QUAD_WIDTH, (QUAD_HEIGHT / 2) + y * QUAD_HEIGHT);
+            quad.color = randomColor();
+            quads[x][y] = quad;
+        }
+    }
+}
+
+void checkForQuadEliminationAndAddScore() {
+    if (!selectedQuad->visible) {
+        selectedQuad = nullptr;
+        return;
+    }
+
+    selectedQuad->visible = false;
+
+    score -= PLAY_COST;
+    int chain = 0;
+
+    for (int x = 0; x < COLUMNS; x++) {
+        for (int y = 0; y < ROWS; y++) {
+            Quad* currentQuad = &quads[x][y];
+
+            const double distance = sqrt(
+                pow( selectedQuad->color.r - currentQuad->color.r,2)
+                + pow( selectedQuad->color.g - currentQuad->color.g,2)
+                + pow( selectedQuad->color.b - currentQuad->color.b,2));
+
+            double relativeDistance = distance / MAX_DISTANCE;
+
+            if (relativeDistance <= TOLERANCE) {
+                currentQuad->visible = false;
+                chain++;
+            }
+        }
+    }
+    selectedQuad = nullptr;
+
+    score += chain * CHAIN_MULTIPLIER;
+}
+
+bool gameHasEnded() {
+    for (int x = 0; x < COLUMNS; x++) {
+        for (int y = 0; y < ROWS; y++) {
+            if (quads[x][y].visible) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void printScore() {
+    std::cout << "Parabéns! você obteve " << score << " pontos" << std::endl;
+    std::cout << "Recomeçando" << std::endl;
+}
+
+void restartGame() {
+    generateBoard();
+    score = 0;
+}
+
+void processInput(GLFWwindow* window) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
+
+    if (selectedQuad != nullptr) {
+        checkForQuadEliminationAndAddScore();
+        if (gameHasEnded()) {
+            printScore();
+            restartGame();
+        };
+    }
+}
+
+int main() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Otavio Triangulos", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Jogo das Cores - Otavio", nullptr, nullptr);
 
     if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -182,38 +264,36 @@ int main() {
     glViewport(0, 0, WIDTH, HEIGHT);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
-    glfwSetWindowUserPointer(window, &triangles);
     glfwSetMouseButtonCallback(window,
     [] (GLFWwindow* window, int button, int action, int mods)
         {
-
             if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
             {
-                auto triangles = static_cast<std::vector<Triangle>*>(glfwGetWindowUserPointer(window));
                 double xpos, ypos;
                 glfwGetCursorPos(window, &xpos, &ypos);
 
-                Triangle triangle = {};
-                triangle.position = glm::vec2(xpos,ypos);
-                triangle.color = randomColor();
+                int x = xpos / QUAD_WIDTH;
+                int y = ypos / QUAD_HEIGHT;
 
-                triangles->push_back(triangle);
+                selectedQuad = &quads[x][y];
             }
         }
     );
 
     const GLuint shaderProgram = createShaderProgram();
-    GLuint triangleVAO = createTriangle(-0.5f,  -0.5f, 0.5f, -0.5f, 0.0, 0.5f);
+    GLuint baseQuadVAO = createQuad(
+        -0.5f, 0.5f,
+        -0.5f, -0.5f,
+        0.5, 0.5f,
+        0.5f, -0.5f
+    );
 
-    Triangle baseTriangle = {};
-    baseTriangle.position = glm::vec2(400.0f, 300.0f);
-    baseTriangle.color = randomColor();
-    triangles.push_back(baseTriangle);
+    generateBoard();
 
     glUseProgram(shaderProgram);
 
     GLint colorLoc = glGetUniformLocation(shaderProgram, "inputColor");
-    glm::mat4 projection = glm::ortho(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
+    glm::mat4 projection = glm::ortho(0.0, (double) WIDTH, (double) HEIGHT, 0.0, -1.0, 1.0);
     glUniformMatrix4fv(
         glGetUniformLocation(shaderProgram, "projection"),
         1,
@@ -226,38 +306,42 @@ int main() {
         glfwPollEvents();
         processInput(window);
 
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClearColor(clearColor.r, clearColor.g, clearColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         glLineWidth(10);
         glPointSize(20);
 
+        glBindVertexArray(baseQuadVAO);
+        for (int x = 0; x < COLUMNS; x++) {
+            for (int y = 0; y < ROWS; y++) {
+                Quad quad = quads[x][y];
 
-        glBindVertexArray(triangleVAO);
-        for (const Triangle triangle : triangles) {
-            glm::mat4 model = glm::mat4(1);
+                glm::mat4 model = glm::mat4(1);
 
-            model = glm::translate(model, glm::vec3(triangle.position,  0.0));
-            model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0,0,1));
-            model = glm::scale(model, glm::vec3(100, 100, 1.0));
+                model = glm::translate(model, glm::vec3(quad.position,  0.0));
+                model = glm::scale(model, glm::vec3(QUAD_WIDTH, QUAD_HEIGHT, 1.0));
 
-            glUniformMatrix4fv(
-                glGetUniformLocation(shaderProgram, "model"),
-                1,
-                GL_FALSE,
-                value_ptr(model)
-            );
+                glUniformMatrix4fv(
+                    glGetUniformLocation(shaderProgram, "model"),
+                    1,
+                    GL_FALSE,
+                    value_ptr(model)
+                );
 
-            glUniform4f(colorLoc, triangle.color.r, triangle.color.g, triangle.color.b, 1.0f);
+                auto color = quad.visible ? quad.color : clearColor;
 
-            glDrawArrays(GL_TRIANGLES, 0, 3);
+                glUniform4f(colorLoc, color.r, color.g, color.b, 1.0f);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
+
+            }
         }
 
         glBindVertexArray(0);
         glfwSwapBuffers(window);
     }
 
-    glDeleteVertexArrays(1, &triangleVAO);
+    glDeleteVertexArrays(1, &baseQuadVAO);
     glDeleteProgram(shaderProgram);
 
     glfwTerminate();

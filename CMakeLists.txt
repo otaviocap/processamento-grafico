@@ -36,6 +36,7 @@ include_directories(${glm_SOURCE_DIR})
 set(EXERCISES
         m2/m2_p1
         m2/m2_p2
+        m3/m3
 )
 
 add_compile_options(-Wno-pragmas)
