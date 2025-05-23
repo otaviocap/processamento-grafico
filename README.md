@@ -17,6 +17,17 @@ Trabalhos feitos por: **Otávio Henrique**
     - Um VAO base com triângulo padrão.
     - Novos triângulos criados com cliques do mouse e cores sorteadas.
 
+### Modulo 3
+
+**Jogo das cores**
+- Implementar um jogo que avalia uma escolha de cor.
+  - Dado um tabuleiro de retângulos com cores similares remova todos que tenham uma cor similar.
+- Cada tentativa deve dar uma pontuação para o jogador.
+  - Essa pontuação deve ser proporcional ao número de retângulos removidos;
+  - Cada tentativa tem um custo que será removido da pontuação final.
+- Ao final o jogo deve indicar a pontuação total e reiniciar.
+
+
 ## 📁 Estrutura
 
 ```
@@ -46,3 +57,4 @@ make
 ## 📚 Exercícios Disponíveis
 - `m2_p1`: Implementa os **Exercícios 1 e 2** do **Módulo 2** (sem matriz de transformação).
 - `m2_p2`: Implementa o **Exercício 3** do **Módulo 2** (com matriz de transformação, uso de GLM).
+- `m3`: Implementa o **Jogo das cores** do **Módulo 3**.
