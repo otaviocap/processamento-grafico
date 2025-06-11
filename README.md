@@ -38,6 +38,14 @@ Trabalhos feitos por: **Otávio Henrique**
 
 - Desenhe uma cena composta por vários retângulos texturizados (sprites) com diferentes texturas.
 
+### Modulo 5
+
+**Sprites com animação**
+
+- Adicione as seguintes funcionalidades à classe Sprite:
+  - Suporte a animações por spritesheet
+  - Controle por teclado nas 4 direções (N, S, L, O) a partir das teclas WASD ou setas
+
 ## 📁 Estrutura
 
 ```
@@ -73,3 +81,4 @@ make
 - `m3`: Implementa o **Jogo das cores** do **Módulo 3**.
 - `m4`: Implementa o **Mapeamento de texturas** do **Módulo 4**. Utiliza como base a implementação feita para a
   atividade vivencial do módulo 4.
+- `m5`: Implementa o **Sprite Animado** do **Módulo 5**.

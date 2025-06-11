@@ -17,32 +17,89 @@
 
 class Sprite {
 public:
+    GLuint VAO = 0;
     GLuint textureId = 0;
+
 
     float x = 0;
     float y = 0;
     float rotation = glm::radians(180.0f);
     float scaleX = 1.0f;
     float scaleY = 1.0f;
+
+    glm::mat4 processModel() {
+        auto model = glm::mat4(1);
+
+        model = glm::translate(model, glm::vec3(this->x, this->y, 0.0));
+        model = glm::rotate(model, this->rotation, glm::vec3(0, 0, 1));
+        model = glm::scale(model, glm::vec3(this->scaleX, this->scaleY, 1.0f));
+
+        return model;
+    }
+
+    void draw(const GLuint modelLoc, const GLuint offsetLoc) {
+        auto model = processModel();
+
+        glBindVertexArray(this->VAO);
+        glBindTexture(GL_TEXTURE_2D, this->textureId);
+        glUniformMatrix4fv(modelLoc, 1,GL_FALSE, value_ptr(model));
+        glUniform2f(offsetLoc,0,0);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
 };
 
+enum Direction {
+    Down = 0,
+    Up = 1,
+    Left = 2,
+    Right = 3,
+};
 
-class ParallaxLayer : public Sprite {
+const int DIRECTIONS = 4;
+
+class AnimatableSprite : public Sprite {
 public:
-    float offsetSpeed = 1;
+    int animationLength = 4;
+
+    int animationFrame = 0;
+    Direction direction = Direction::Down;
+
+    glm::vec2 directionOffset = glm::vec2(1.0f / (float) DIRECTIONS, 0.0f);
+    glm::vec2 animationOffset = glm::vec2(0.0f, 1.0f / (float) animationLength);
+
+    bool isIdle = true;
+
+    void changeDirection(Direction direction) {
+        this->isIdle = false;
+
+        if (direction == this->direction) {
+            return;
+        }
+
+        this->direction = direction;
+        animationFrame = 0;
+    }
+
+    void draw(const GLuint modelLoc, const GLuint offsetLoc) {
+        auto model = processModel();
+
+        glBindVertexArray(this->VAO);
+        glBindTexture(GL_TEXTURE_2D, this->textureId);
+        glUniform2f(
+            offsetLoc,
+            directionOffset.x * (float) this->direction + this->animationOffset.x * (float) this->animationFrame,
+            directionOffset.y * (float) this->direction + this->animationOffset.y * (float) this->animationFrame
+        );
+        glUniformMatrix4fv(modelLoc, 1,GL_FALSE, value_ptr(model));
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
 };
 
 constexpr int WIDTH = 800;
 constexpr int HEIGHT = 600;
+constexpr int FPS = 4;
 
-constexpr int PARALLAX_LAYERS = 6;
-
-constexpr float MAX_CHARACTER_Y = 304.0f;
-constexpr float MIN_CHARACTER_Y = 285.0f;
-constexpr float MAX_CHARACTER_X = (float) WIDTH;
-constexpr float MIN_CHARACTER_X = 0.0f;
-
-Sprite character;
+AnimatableSprite character;
 
 constexpr auto vertexShaderSource = R"GLSL(
  #version 400
@@ -81,14 +138,20 @@ void framebuffer_size_callback(GLFWwindow *window, const int width, const int he
 void process_input(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
-    } else if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-        character.y = std::max(character.y - 1, MIN_CHARACTER_Y);
-    } else if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-        character.y = std::min(character.y + 1, MAX_CHARACTER_Y);
-    } else if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-        character.x = std::max(character.x - 1, MIN_CHARACTER_X);;
-    } else if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-        character.x = std::min(character.x + 1, MAX_CHARACTER_X);;
+    } else if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        character.changeDirection(Up);
+        character.y += 1;
+    } else if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        character.changeDirection(Down);
+        character.y -= 1;
+    } else if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        character.changeDirection(Left);
+        character.x += 1;
+    } else if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        character.changeDirection(Right);
+        character.x -= 1;
+    } else {
+        character.isIdle = true;
     }
 }
 
@@ -147,23 +210,26 @@ GLuint createVBOAndBind(const GLuint VAO, const float *vertices, const int verti
     return VBO;
 }
 
-GLuint setupSprite(float size) {
+GLuint setupSprite(float size, int frames, int directions) {
     GLuint VAO;
     glGenVertexArrays(1, &VAO);
 
+    float framesOffset = 1.0f / (float) frames;
+    float directionOffset = 1.0f / (float) directions;
+
     GLfloat vertices[] = {
         // x     y     z     s     t
-        -1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-        -1.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-        1.0f, -1.0f, 0.0f, 1.0f, 1.0f
+        -0.5,  0.5, 0.0, 0.0, directionOffset, //V0
+        -0.5, -0.5, 0.0, 0.0, 0.0, //V1
+         0.5,  0.5, 0.0, framesOffset, directionOffset, //V2
+         0.5, -0.5, 0.0, framesOffset, 0.0  //V3
     };
 
-    for (int i = 0; i < sizeof(vertices) / sizeof(vertices[0]); i++) {
-        vertices[i] *= size;
+    for (float & vertice : vertices) {
+        vertice *= size;
     }
 
-    createVBOAndBind(VAO, vertices, sizeof(vertices) / sizeof(vertices[0]));
+    createVBOAndBind(VAO, vertices, std::size(vertices));
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) 0);
     glEnableVertexAttribArray(0);
@@ -212,52 +278,28 @@ GLuint loadTexture(const std::string &filePath) {
     return texID;
 }
 
-
-void drawSprite(const GLuint modelLoc, const GLuint offsetLoc, const Sprite &sprite, float xTexOffset,
-                float yTexOffset) {
-    glBindTexture(GL_TEXTURE_2D, sprite.textureId);
-
-    auto model = glm::mat4(1);
-
-    model = glm::translate(model, glm::vec3(sprite.x, sprite.y, 0.0));
-    model = glm::rotate(model, sprite.rotation, glm::vec3(0, 0, 1));
-    model = glm::scale(model, glm::vec3(sprite.scaleX, sprite.scaleY, 1.0f));
-
-    glUniform2f(offsetLoc, xTexOffset, yTexOffset);
-    glUniformMatrix4fv(modelLoc, 1,GL_FALSE, value_ptr(model));
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-}
-
-void generateParallaxLayers(ParallaxLayer (&parallaxLayers)[6]) {
-    for (int i = 0; i < PARALLAX_LAYERS; i++) {
-        ParallaxLayer pl = {};
-        pl.x = WIDTH / 2;
-        pl.y = HEIGHT / 2;
-        pl.scaleX = WIDTH / 1.8f;
-        pl.scaleY = HEIGHT / 1.8f;
-        pl.offsetSpeed = (float) i / 16.0f;
-        pl.textureId = loadTexture("../assets/m4/" + std::to_string(i) + ".png");
-        glTexParameteri(pl.textureId, GL_TEXTURE_WRAP_S, GL_REPEAT);
-
-        parallaxLayers[i] = pl;
-    }
-}
-
 void generateCharacter() {
     character.x = (float) WIDTH / 2;
     character.y = (float) HEIGHT / 2;
-    character.scaleX = 25.0f;
-    character.scaleY = 25.0f;
-    character.rotation = glm::radians(170.0f);
-    character.textureId = loadTexture("../assets/m4/character.png");
+    character.scaleX = 35;
+    character.scaleY = 35;
+    character.textureId = loadTexture("../assets/m5/character.png");
+
+    character.VAO = setupSprite(1, 4, 4);
 }
 
-void drawCharacter(GLint offsetLoc, GLint modelLoc, float xModifier, float yModifier) {
-    character.x += xModifier;
-    character.y += yModifier;
-    drawSprite(modelLoc, offsetLoc, character, 1.0f, 0.0f);
-    character.x -= xModifier;
-    character.y -= yModifier;
+Sprite generateBackground() {
+    Sprite sprite;
+    sprite.x = WIDTH / 2;
+    sprite.y = HEIGHT / 2;
+    sprite.scaleX = WIDTH;
+    sprite.scaleY = HEIGHT;
+
+    sprite.textureId = loadTexture("../assets/m5/background.png");
+
+    sprite.VAO = setupSprite(1, 1, 1);
+
+    return sprite;
 }
 
 int main() {
@@ -268,7 +310,7 @@ int main() {
 
     glfwWindowHint(GLFW_SAMPLES, 8);
 
-    GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "M4 - Mapeamento de Texturas - Otávio", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "M5 - Personagem com animação - Otávio", nullptr, nullptr);
 
     if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -287,10 +329,9 @@ int main() {
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     const GLuint shaderProgram = createShaderProgram();
-    GLuint VAO = setupSprite(1);
+    Sprite background = generateBackground();
 
-    ParallaxLayer parallaxLayers[6];
-    generateParallaxLayers(parallaxLayers);
+
     generateCharacter();
 
     glUseProgram(shaderProgram);
@@ -304,13 +345,15 @@ int main() {
     GLint offsetLoc = glGetUniformLocation(shaderProgram, "offset");
     GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
 
-    glm::mat4 projection = glm::ortho(0.0f, (float) WIDTH, (float) HEIGHT, 0.0f, -1.0f, 1.0f);
+    glm::mat4 projection = glm::ortho((float) WIDTH, 0.0f,  0.0f, (float) HEIGHT, -1.0f, 1.0f);
     glUniformMatrix4fv(
         glGetUniformLocation(shaderProgram, "projection"),
         1,
         GL_FALSE,
         value_ptr(projection)
     );
+
+    double lastTime = glfwGetTime();
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -319,28 +362,25 @@ int main() {
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glBindVertexArray(VAO);
         double currentTime = glfwGetTime();
+        double deltaTime = currentTime - lastTime;
 
-        for (int i = 0; i < PARALLAX_LAYERS; i++) {
-            ParallaxLayer layer = parallaxLayers[i];
-
-            drawSprite(modelLoc, offsetLoc, layer,
-                       (-currentTime + character.x / 1500) * layer.offsetSpeed,
-                       (character.y - HEIGHT / 2) / 100 * layer.offsetSpeed
-            );
+        if (deltaTime >= 1.0/FPS)
+        {
+            character.animationFrame = !character.isIdle
+                ? (character.animationFrame + 1) % character.animationLength
+                : 0;
+            lastTime = currentTime;
         }
 
-        character.y += 10 * sin(currentTime);
-        drawCharacter(offsetLoc, modelLoc, 0, 0);
-        drawCharacter(offsetLoc, modelLoc, -50, 25);
-        drawCharacter(offsetLoc, modelLoc, -50, -25);
-        character.y -= 10 * sin(currentTime);
+        background.draw(modelLoc, offsetLoc);
+        character.draw(modelLoc, offsetLoc);
 
         glfwSwapBuffers(window);
     }
 
-    glDeleteVertexArrays(1, &VAO);
+    glDeleteVertexArrays(1, &character.VAO);
+    glDeleteVertexArrays(1, &background.VAO);
     glDeleteProgram(shaderProgram);
 
     glfwTerminate();

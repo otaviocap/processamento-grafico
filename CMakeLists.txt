@@ -48,6 +48,7 @@ set(EXERCISES
         m2/m2_p2
         m3/m3
         m4/m4
+        m5/m5
 )
 
 add_compile_options(-Wno-pragmas)
